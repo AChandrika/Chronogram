@@ -1,0 +1,24 @@
+{
+  "pilotName": "Chronogram Calendar — Ulster County Pilot",
+  "county": "Ulster",
+  "windowStart": "2026-12-01",
+  "windowEnd": "2027-05-31",
+  "chronogramBase": "https://calendar.chronogram.com/hudsonvalley",
+  "googleSheetCsv": "https://docs.google.com/spreadsheets/d/11COCR19_iwHA74RJLnQBiWoeFtVDu0SgkmfmAJkRoGA/export?format=csv",
+  "chronogramDiningCategories": {
+    "2124940": "General Dining",
+    "2124939": "American",
+    "2124952": "Italian",
+    "2124954": "French",
+    "2124956": "Mediterranean",
+    "2124964": "Thai",
+    "2124943": "Pizza",
+    "2124955": "Bakery",
+    "2124985": "Bar",
+    "2124978": "Bagels",
+    "2124977": "Deli",
+    "2124953": "Desserts",
+    "2124949": "Creole",
+    "2124944": "Barbecue"
+  }
+}

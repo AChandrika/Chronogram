@@ -1,0 +1,4 @@
+type,title,category,start_date,end_date,start_time,end_time,venue,address,town,price,link,image_url,description
+event,Example: Winter Jazz Night,Music,2026-12-18,,7:30 PM,10:00 PM,Example Hall,123 Wall St,Kingston,$20,https://example.com/tickets,,Delete this example row. One row per event.
+restaurant,Example: Main Street Diner,American,,,,,,45 Main St,New Paltz,,https://example.com,,Delete this example row. Restaurants added here show up in plans.
+hide,,,,,,,,,,,https://calendar.chronogram.com/hudsonvalley/some-event/Event?oid=123,,Use type=hide with a Chronogram link to remove an event from the pilot.

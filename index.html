@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Chronogram Community Calendar — Ulster County Pilot</title>
+  <meta name="description" content="Everything happening in Ulster County, with a day planner that adds food, drive times and ticket prices.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%238e3b22%22/%3E%3Ctext x=%2216%22 y=%2223%22 font-size=%2220%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22Georgia%22%3EC%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="./">
+        <span class="brand-mark">Chronogram<span>Media</span></span>
+        <span class="brand-divider" aria-hidden="true"></span>
+        <span class="brand-sub">Community Calendar</span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a href="#discover">Discover</a>
+        <a href="#top" data-focus-search>Plan a trip</a>
+        <a href="#about">About</a>
+        <a class="btn btn-primary" href="https://calendar.chronogram.com/hudsonvalley/Events/AddEvent" target="_blank" rel="noopener">Submit an Event</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero wrap">
+      <p class="eyebrow">Ulster County pilot · <span id="window-label">Dec 2026 – May 2027</span></p>
+      <h1>Everything happening in Ulster County, <em>planned for you.</em></h1>
+      <p class="lede">Music, film, art, markets and more from Chronogram's calendar. Tell us what you like and when you're free, and we'll build the day for you: what to see, where to eat, how far to drive and what tickets cost.</p>
+
+      <form class="search" id="search-form" autocomplete="off">
+        <label class="sr-only" for="q">Describe your plans or search events</label>
+        <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <textarea id="q" rows="1" placeholder="Try: I like music and movies, plan Dec 19–20 near Kingston"></textarea>
+        <button class="btn btn-primary btn-lg" type="submit" id="go">Plan it</button>
+      </form>
+
+      <div class="try">
+        <span class="try-label">Try one:</span>
+        <button class="try-chip" data-q="I like live music and movies. Plan my 2 days, Dec 19–20, near Kingston">✦ Music + movies, Dec 19–20</button>
+        <button class="try-chip" data-q="Date night in New Paltz on Valentine's Day, Italian dinner">✦ Valentine's date night</button>
+        <button class="try-chip" data-q="Free family fun Presidents' Day weekend">✦ Free family weekend</button>
+        <button class="try-chip" data-q="Art and theater in Woodstock in January, under $40">✦ Art + theater in Woodstock</button>
+      </div>
+      <p class="hint">Just want to browse? Type a word like <button class="link" data-q="jazz">jazz</button> or <button class="link" data-q="Saugerties">Saugerties</button>, or use the filters below.</p>
+    </section>
+
+    <section id="plan" class="wrap plan" hidden aria-live="polite"></section>
+
+    <section id="discover" class="wrap discover">
+      <div class="filters">
+        <div class="chip-row" id="cat-chips" role="group" aria-label="Category"></div>
+        <div class="chip-row small" id="date-chips" role="group" aria-label="Date"></div>
+        <div class="chip-row small" id="town-chips" role="group" aria-label="Town"></div>
+      </div>
+      <div class="list-head">
+        <h2 id="list-title">Coming up in Ulster County</h2>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="grid" id="grid"></div>
+      <div class="more-wrap"><button class="btn btn-ghost" id="more" hidden>Show more events</button></div>
+    </section>
+
+    <section id="about" class="wrap about">
+      <h2>About this pilot</h2>
+      <p>This is a test version of Chronogram's community calendar for <strong>Ulster County</strong>, covering <span class="window-label-2">December 2026 through May 2027</span>. Events come from <a href="https://calendar.chronogram.com/hudsonvalley/EventSearch" target="_blank" rel="noopener">Chronogram's calendar</a> plus additions from the Chronogram team. Restaurants come from Chronogram's Places listings and OpenStreetMap.</p>
+      <p>The planner runs right in your browser. Drive times are estimates based on distance, so check a map before you go. Ticket prices are as listed by the organizer.</p>
+      <p class="updated" id="updated"></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">© Chronogram Media · Pilot preview, not for public distribution. Map data © OpenStreetMap contributors.</div>
+  </footer>
+
+  <dialog id="detail" class="detail" aria-labelledby="detail-title"></dialog>
+
+  <script type="module" src="assets/app.js"></script>
+</body>
+</html>

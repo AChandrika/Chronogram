@@ -1,0 +1,12 @@
+{
+ "updatedAt": "2026-11-09T21:16:47.689Z",
+ "windowStart": "2026-12-01",
+ "windowEnd": "2027-05-31",
+ "county": "Ulster",
+ "counts": {
+  "events": 106,
+  "places": 64,
+  "sheetEvents": 0,
+  "sheetPlaces": 0
+ }
+}
