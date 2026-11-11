@@ -257,7 +257,18 @@ async function buildStudios() {
     const key = (s.name + town).toLowerCase().replace(/[^a-z]/g, ''); if (seen.has(key)) continue; seen.add(key);
     const g = await geocode(`${s.street}, ${s.town}, NY`) || await geocode(`${town}, Ulster County, NY`);
     if (!g) continue;
-    studios.push({ id: 'st-' + ((s.url.match(/oid=(\d+)/) || [])[1] || slug(s.name)), name: s.name, kinds: s.kinds, address: `${s.street}, ${s.town}, NY`, town, lat: g.lat, lng: g.lng, url: s.url, source: 'Chronogram' });
+    // the studio's own website (Chronogram's listing page can show old events)
+    let website = null;
+    try {
+      const $$ = cheerio.load(await get(s.url));
+      $$('a[href^="http"]').each((_, a) => {
+        const t = $$(a).text().trim(), h = $$(a).attr('href');
+        if (!website && !/chronogram|newspack/i.test(h) && (/^(https?:\/\/)?(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?$/i.test(t) || /website/i.test(t))) website = h;
+      });
+      await sleep(500);
+    } catch {}
+    if (website && studios.some(x => x.website === website)) continue;
+    studios.push({ id: 'st-' + ((s.url.match(/oid=(\d+)/) || [])[1] || slug(s.name)), name: s.name, kinds: s.kinds, address: `${s.street}, ${s.town}, NY`, town, lat: g.lat, lng: g.lng, url: s.url, website, source: 'Chronogram' });
   }
   return studios;
 }
@@ -320,7 +331,7 @@ async function sheetRows(rows) {
     const town = ulsterTownIn(r.town) || ulsterTownIn(address) || r.town || null;
     if (type === 'studio') {
       if (!g) continue;
-      places.push({ _studio: true, id: 'sh-st-' + slug(r.title), name: r.title, kinds: (r.category || 'Yoga').split(/[;,]/).map(s => s.trim()), address, town, lat: g.lat, lng: g.lng, url: r.link || null, source: 'Chronogram team' });
+      places.push({ _studio: true, id: 'sh-st-' + slug(r.title), name: r.title, kinds: (r.category || 'Yoga').split(/[;,]/).map(s => s.trim()), address, town, lat: g.lat, lng: g.lng, url: r.link || null, website: r.link || null, source: 'Chronogram team' });
       continue;
     }
     if (type === 'weekly') {

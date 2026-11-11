@@ -1,4 +1,4 @@
-import { $, esc, MON, MONTH_LONG, CATS, STYLE, svg, dateObj, isoOf, fmtDate, fmtDateLong, timeRange, todayISO, loadData, bag, dotGrid } from './common.js';
+import { $, esc, MON, MONTH_LONG, CATS, STYLE, svg, studioLink, dateObj, isoOf, fmtDate, fmtDateLong, timeRange, todayISO, loadData, bag, dotGrid } from './common.js';
 import { buildIndex, parseSearch, runSearch, pills, hasMeaning } from './search.js';
 import { bookingOf, drive } from './planner.js';
 
@@ -64,7 +64,7 @@ function render() {
     studios = data.studios.filter(s => !kw || s.kinds.some(k => k.toLowerCase().includes(kw.replace(/s$/, ''))) || s.name.toLowerCase().includes(kw))
       .filter(s => !f.town || s.town === f.town || (f.near && anchor && s.lat != null && drive(anchor, s).minutes <= 20));
   }
-  const studiosHTML = studios.length ? `<div class="ongoing"><h3 class="group-title">Studios with regular classes <span>${studios.length}</span></h3><div class="ongoing-row">${studios.map(s => `<a class="mini" href="${esc(s.url)}" target="_blank" rel="noopener"><span class="mini-thumb t-sage">${svg('leaf')}</span><span class="mini-body"><b>${esc(s.name)}</b><span>${esc(s.kinds.join(' / '))} · ${esc(s.town)} · check class times</span></span></a>`).join('')}</div></div>` : '';
+  const studiosHTML = studios.length ? `<div class="ongoing"><h3 class="group-title">Studios with regular classes <span>${studios.length}</span></h3><div class="ongoing-row">${studios.map(s => `<a class="mini" href="${esc(studioLink(s))}" target="_blank" rel="noopener"><span class="mini-thumb t-sage">${svg('leaf')}</span><span class="mini-body"><b>${esc(s.name)}</b><span>${esc(s.kinds.join(' / '))} · ${esc(s.town)} · check class times</span></span></a>`).join('')}</div></div>` : '';
   const ongoing = f.cheap || f.keywords.length ? [] : results.filter(r => r.e.ongoing);
   const dated = f.cheap || f.keywords.length ? results : results.filter(r => !r.e.ongoing);
   $('#count').textContent = `${results.length} event${results.length === 1 ? '' : 's'}`;

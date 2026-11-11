@@ -1,4 +1,4 @@
-import { $, esc, MON, CATS, STYLE, svg, dateObj, isoOf, fmtDate, fmtDateLong, fmtTime, timeRange, todayISO, loadData, bag } from './common.js';
+import { $, esc, MON, CATS, STYLE, svg, studioLink, studioLinkLabel, dateObj, isoOf, fmtDate, fmtDateLong, fmtTime, timeRange, todayISO, loadData, bag } from './common.js';
 import { buildPlan, parseQuery } from './planner.js';
 
 const STEPS = [
@@ -136,7 +136,7 @@ function stopHTML(s, d, i) {
     return legHTML + `<div class="stop"><div class="stop-time">${fmtTime(s.start)}<small>approx.</small></div><div class="stop-box studio">
       <div class="stop-kind c-sage">Fits your gap · Drop-in option</div><h4>${esc(st.kinds.join(' / '))} at ${esc(st.name)}</h4><p>${esc(st.town)} · No class time listed here, so check their schedule first.</p>
       ${s.backup ? `<p class="backup">Backup: ${esc(s.backup.name)}, ${esc(s.backup.town)}</p>` : ''}
-      <div class="stop-actions"><a href="${esc(st.url)}" target="_blank" rel="noopener">Check class times</a><a href="https://www.openstreetmap.org/?mlat=${st.lat}&mlon=${st.lng}#map=17/${st.lat}/${st.lng}" target="_blank" rel="noopener">Map</a><button class="swap" data-swap-place="${esc(st.id)}">${svg('swap')} Swap</button></div></div></div>`;
+      <div class="stop-actions"><a href="${esc(studioLink(st))}" target="_blank" rel="noopener">${studioLinkLabel(st)}</a><a href="https://www.openstreetmap.org/?mlat=${st.lat}&mlon=${st.lng}#map=17/${st.lat}/${st.lng}" target="_blank" rel="noopener">Map</a><button class="swap" data-swap-place="${esc(st.id)}">${svg('swap')} Swap</button></div></div></div>`;
   }
   if (s.type === 'meal') {
     const p = s.item;

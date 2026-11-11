@@ -52,6 +52,10 @@ const ICONS = {
 };
 export const svg = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.home}</svg>`;
 
+// Studio schedule link: their own website when known, otherwise a web search for their schedule (never Chronogram's listing, which can show old events)
+export const studioLink = s => s.website || `https://www.google.com/search?q=${encodeURIComponent(`${s.name} ${s.town} NY class schedule`)}`;
+export const studioLinkLabel = s => s.website ? 'See class times' : 'Find class times';
+
 // ---------- data ----------
 export async function loadData() {
   const get = (u, d) => fetch(u, { cache: 'no-cache' }).then(r => r.ok ? r.json() : d).catch(() => d);
