@@ -45,7 +45,7 @@ The sheet is already linked in `config.json`.
 1. Open the sheet. Paste this exact header row into **row 1**:
 
    ```
-   type,title,category,start_date,end_date,start_time,end_time,venue,address,town,price,link,image_url,description
+   type,title,category,start_date,end_date,start_time,end_time,venue,address,town,price,link,image_url,description,weekday
    ```
    Or import `sheet/sheet-columns.csv` with **File → Import → Replace current sheet**. It includes three example rows; delete them.
 2. Keep sharing set to **Anyone with the link → Viewer**. That's how the site reads it.
@@ -54,6 +54,8 @@ The sheet is already linked in `config.json`.
 |---|---|
 | `event` | Adds an event. Needs at least `title` and `start_date` (2026-12-18 or 12/18/2026). Fill in times like `7:30 PM`. |
 | `restaurant` | Adds a place to eat that the planner can suggest. Needs `title` plus `address` and/or `town`. |
+| `weekly` | A class that repeats every week (yoga, pilates…). Put the day(s) in `weekday`, e.g. `Saturday` or `Mon, Wed`, plus `start_time`. Optional `start_date`/`end_date` limit the run. |
+| `studio` | A yoga/pilates studio the planner can suggest as a drop-in option (no set time). Needs `title`, `address` and/or `town`; `category` like `Yoga` or `Pilates`; `link` to their schedule. |
 | `hide` | Removes a Chronogram event from the pilot. Put the event's Chronogram link in `link`. |
 
 Categories the site understands: Music, Film, Arts & Culture, Theater & Comedy, Food & Drink, Family, Outdoors, Classes & Workshops, Talks & Literary, Wellness, Markets & Festivals, Community.

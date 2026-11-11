@@ -55,7 +55,7 @@ export const svg = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 2
 // ---------- data ----------
 export async function loadData() {
   const get = (u, d) => fetch(u, { cache: 'no-cache' }).then(r => r.ok ? r.json() : d).catch(() => d);
-  const [events, places, meta] = await Promise.all([get('data/events.json', []), get('data/places.json', []), get('data/meta.json', null)]);
+  const [events, places, meta, studios] = await Promise.all([get('data/events.json', []), get('data/places.json', []), get('data/meta.json', null), get('data/wellness.json', [])]);
   const acc = {};
   for (const x of [...events, ...places]) {
     if (!x.town || x.lat == null) continue;
@@ -68,7 +68,7 @@ export async function loadData() {
   const topTowns = Object.entries(acc).filter(([, a]) => a.ev).sort((a, b) => b[1].ev - a[1].ev).map(([t]) => t);
   const windowStart = meta?.windowStart || '2026-12-01', windowEnd = meta?.windowEnd || '2027-05-31';
   const fmtMY = s => { const d = dateObj(s); return `${MONTH_LONG[d.getMonth()]} ${d.getFullYear()}`; };
-  return { events, places, meta, townCenters, towns: Object.keys(townCenters), topTowns, windowStart, windowEnd, windowLabel: `${fmtMY(windowStart)} – ${fmtMY(windowEnd)}` };
+  return { events, places, meta, studios, townCenters, towns: Object.keys(townCenters), topTowns, windowStart, windowEnd, windowLabel: `${fmtMY(windowStart)} – ${fmtMY(windowEnd)}` };
 }
 
 // ---------- "My day" bag (saved events, kept in this browser) ----------

@@ -22,7 +22,7 @@ let data, today, step = 0, prefs, swap = { exclude: [], excludePlaces: [] }, las
 function defaults() {
   const base = dateObj(today < data.windowStart ? data.windowStart : today);
   const sat = new Date(base); sat.setDate(base.getDate() + ((6 - base.getDay() + 7) % 7));
-  return { start: isoOf(sat), count: 1, hours: ['morning', 'afternoon', 'evening'], interests: [], who: null, town: data.topTowns[0] || 'Kingston', radius: 30, meals: { breakfast: 'skip', lunch: 'out', dinner: 'out' }, cuisine: 'Any', budget: null, pace: 'balanced', pinned: [] };
+  return { start: isoOf(sat), count: 1, hours: ['morning', 'afternoon', 'evening'], interests: [], who: null, town: data.topTowns[0] || 'Kingston', radius: 30, meals: { breakfast: 'skip', lunch: 'out', dinner: 'out' }, cuisine: 'Any', budget: null, pace: 'balanced', pinned: [], wellnessFill: false };
 }
 const load = () => { try { return JSON.parse(localStorage.getItem('cg-prefs') || 'null'); } catch { return null; } };
 const save = () => { try { const { pinned, ...rest } = prefs; localStorage.setItem('cg-prefs', JSON.stringify(rest)); } catch {} };
@@ -58,7 +58,8 @@ function renderStep() {
     const counts = {}; for (const e of data.events) counts[e.category] = (counts[e.category] || 0) + 1;
     h = `<h2 class="q">What are you in the mood for?</h2><p class="q-sub">Pick as many as you like.</p>
       <div class="cards interest">${CATS.filter(c => counts[c]).map(c => { const [tint, icon] = STYLE[c]; const on = prefs.interests.includes(c); return `<button class="card-opt ${on ? 'on' : ''}" data-int="${esc(c)}" aria-pressed="${on}"><span class="ci t-${tint}">${svg(icon)}</span><b>${esc(c)}</b></button>`; }).join('')}</div>
-      <button class="opt surprise ${!prefs.interests.length ? 'on' : ''}" data-int="__any">${svg('sparkle')} Surprise me with a mix</button>`;
+      <button class="opt surprise ${!prefs.interests.length ? 'on' : ''}" data-int="__any">${svg('sparkle')} Surprise me with a mix</button>
+      <label class="toggle wellness-toggle"><input type="checkbox" id="w-well" ${prefs.wellnessFill ? 'checked' : ''}><span><b>Open to yoga or pilates if there's a gap?</b><small>If part of your day is empty, we'll suggest a class or a nearby studio. Seats aren't guaranteed, so we'll flag anything that needs booking.</small></span></label>`;
   }
   if (s === 'who') {
     h = `<h2 class="q">Who's coming?</h2><div class="cards two">${WHO.map(w => `<button class="card-opt big ${prefs.who === w.v ? 'on' : ''}" data-who="${w.v}" aria-pressed="${prefs.who === w.v}">${svg(w.icon)}<b>${w.label}</b><span>${w.hint}</span></button>`).join('')}</div>`;
@@ -92,7 +93,7 @@ function renderSummary() {
   const pinned = prefs.pinned.map(id => data.events.find(e => e.id === id)).filter(Boolean);
   $('#summary').innerHTML = `<div class="summary-card"><h2>Your day so far</h2><ul>
     ${it(0, 'When', `${ds.length > 1 ? fmtDate(ds[0]) + ' – ' + fmtDate(ds.at(-1)) : fmtDate(ds[0])}<small>${prefs.hours.length === 3 ? 'All day' : prefs.hours.map(h => h[0].toUpperCase() + h.slice(1)).join(', ')}</small>`)}
-    ${it(1, 'What', prefs.interests.length ? esc(prefs.interests.join(', ')) : 'A bit of everything')}
+    ${it(1, 'What', (prefs.interests.length ? esc(prefs.interests.join(', ')) : 'A bit of everything') + (prefs.wellnessFill ? '<small>Yoga or pilates for gaps</small>' : ''))}
     ${it(2, 'Who', prefs.who ? WHO.find(w => w.v === prefs.who).label : '<i>Not picked yet</i>')}
     ${it(3, 'Where', `${esc(prefs.town)}<small>${prefs.radius ? 'Within ' + prefs.radius + ' min' : 'Anywhere in the county'}</small>`)}
     ${it(4, 'Meals', meals + (prefs.cuisine !== 'Any' && Object.values(prefs.meals).includes('out') ? `<small>${esc(prefs.cuisine)}</small>` : ''))}
@@ -107,13 +108,13 @@ function toParsed() {
     days: daysOf(prefs), notes: [], interests: prefs.interests, keywords: [], near: prefs.town,
     budget: prefs.budget === 'free' ? 0 : prefs.budget, cuisines: prefs.cuisine === 'Any' ? [] : (cz[prefs.cuisine] || [prefs.cuisine.toLowerCase()]),
     kids: prefs.who === 'family', dateNight: prefs.who === 'couple', hours: prefs.hours, radiusMin: prefs.radius, meals: prefs.meals,
-    pace: prefs.pace === 'balanced' ? null : prefs.pace, pinned: prefs.pinned, exclude: swap.exclude, excludePlaces: swap.excludePlaces
+    pace: prefs.pace === 'balanced' ? null : prefs.pace, wellnessFill: !!prefs.wellnessFill, pinned: prefs.pinned, exclude: swap.exclude, excludePlaces: swap.excludePlaces
   };
 }
 
 function build(animate = true) {
   save(); renderSummary();
-  const plan = buildPlan(toParsed(), { events: data.events, places: data.places, townCenters: data.townCenters, windowStart: data.windowStart, windowEnd: data.windowEnd, windowLabel: data.windowLabel });
+  const plan = buildPlan(toParsed(), { events: data.events, places: data.places, studios: data.studios, townCenters: data.townCenters, windowStart: data.windowStart, windowEnd: data.windowEnd, windowLabel: data.windowLabel });
   lastPlan = plan;
   $('#wizard').hidden = true; $('#result').hidden = false;
   history.replaceState(null, '', '#p=' + btoa(unescape(encodeURIComponent(JSON.stringify(prefs)))));
@@ -130,6 +131,13 @@ function stopHTML(s, d, i) {
   if (leg) legHTML = `<div class="leg"><span>${leg.same ? 'Steps away' : leg.walk ? `${leg.miles} mi · short walk` : `${svg('car')} ${leg.minutes} min drive · ${leg.miles} mi`}</span></div>`;
   else if (i > 0 && s.type === 'home') legHTML = `<div class="leg"><span>${svg('car')} Head home</span></div>`;
   if (s.type === 'home') return legHTML + `<div class="stop"><div class="stop-time">${fmtTime(s.start)}</div><div class="stop-box home-box">${svg('home')}<div><div class="stop-kind">${s.meal}</div><h4>${s.meal} at home</h4></div></div></div>`;
+  if (s.type === 'studio') {
+    const st = s.item;
+    return legHTML + `<div class="stop"><div class="stop-time">${fmtTime(s.start)}<small>approx.</small></div><div class="stop-box studio">
+      <div class="stop-kind c-sage">Fits your gap · Drop-in option</div><h4>${esc(st.kinds.join(' / '))} at ${esc(st.name)}</h4><p>${esc(st.town)} · No class time listed here, so check their schedule first.</p>
+      ${s.backup ? `<p class="backup">Backup: ${esc(s.backup.name)}, ${esc(s.backup.town)}</p>` : ''}
+      <div class="stop-actions"><a href="${esc(st.url)}" target="_blank" rel="noopener">Check class times</a><a href="https://www.openstreetmap.org/?mlat=${st.lat}&mlon=${st.lng}#map=17/${st.lat}/${st.lng}" target="_blank" rel="noopener">Map</a><button class="swap" data-swap-place="${esc(st.id)}">${svg('swap')} Swap</button></div></div></div>`;
+  }
   if (s.type === 'meal') {
     const p = s.item;
     return legHTML + `<div class="stop"><div class="stop-time">${fmtTime(s.start)}</div><div class="stop-box meal">
@@ -139,8 +147,8 @@ function stopHTML(s, d, i) {
   const e = s.item; const [tint, icon] = STYLE[e.category] || STYLE.Community;
   return legHTML + `<div class="stop"><div class="stop-time">${s.flexible ? 'Afternoon<small>open hours</small>' : fmtTime(s.start) + (s.occ?.end ? `<small>to ${fmtTime(s.occ.end)}</small>` : '')}</div>
     <div class="stop-box ev"><button class="stop-open" data-id="${esc(e.id)}"><span class="stop-thumb t-${tint}">${svg(icon)}${e.image ? `<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
-      <span class="stop-txt"><span class="stop-kind c-${tint}">${s.bonus ? 'Something different · ' : ''}${prefs.pinned.includes(e.id) ? 'Your pick · ' : ''}${esc(e.category)}</span><h4>${esc(e.title)}</h4><p>${esc([e.venue, e.town].filter(Boolean).join(' · '))}</p></span></button>
-      <div class="stop-actions"><span class="tag ${e.priceMax === 0 ? 'tag-free' : ''}">${esc(e.price || 'Price not listed')}</span>${e.ticketUrl ? `<a href="${esc(e.ticketUrl)}" target="_blank" rel="noopener">Tickets</a>` : ''}<button class="swap" data-swap="${esc(e.id)}">${svg('swap')} Swap</button></div></div></div>`;
+      <span class="stop-txt"><span class="stop-kind c-${tint}">${s.wellness ? 'Fits your gap · ' : ''}${s.bonus ? 'Something different · ' : ''}${prefs.pinned.includes(e.id) ? 'Your pick · ' : ''}${esc(e.category)}</span><h4>${esc(e.title)}</h4><p>${esc([e.venue, e.town].filter(Boolean).join(' · '))}</p></span></button>
+      <div class="stop-actions"><span class="tag ${e.priceMax === 0 ? 'tag-free' : ''}">${esc(e.price || 'Price not listed')}</span>${s.booking?.required ? `<span class="tag tag-book">Book ahead</span>` : ''}${e.ticketUrl ? `<a href="${esc(e.ticketUrl)}" target="_blank" rel="noopener">${s.booking?.required || s.wellness ? 'Check availability' : 'Tickets'}</a>` : (s.booking?.required || s.wellness) && e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">Check availability</a>` : ''}<button class="swap" data-swap="${esc(e.id)}">${svg('swap')} Swap</button></div></div></div>`;
 }
 
 function renderResult(plan) {
@@ -193,6 +201,7 @@ function wire() {
   document.addEventListener('change', e => {
     if (e.target.id === 'w-start' && e.target.value) { prefs.start = e.target.value; renderStep(); }
     if (e.target.id === 'w-town') { prefs.town = e.target.value; renderSummary(); }
+    if (e.target.id === 'w-well') { prefs.wellnessFill = e.target.checked; renderSummary(); }
   });
   document.addEventListener('submit', e => {
     if (e.target.id !== 'free-form') return; e.preventDefault();

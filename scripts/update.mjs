@@ -227,6 +227,41 @@ async function buildChronogramPlaces() {
   return places;
 }
 
+// ---------- Wellness studios (yoga, pilates…): drop-in options without set class times ----------
+async function buildStudios() {
+  const out = new Map();
+  const crawl = async (query, label) => {
+    for (let p = 1; p <= 20; p++) {
+      let html; try { html = await get(`${CFG.chronogramBase}/LocationSearch?${query}&page=${p}`); } catch { break; }
+      const $ = cheerio.load(html); const items = $('li.fdn-pres-item'); if (!items.length) break;
+      let added = 0;
+      items.each((_, li) => {
+        const a = $(li).find('p.fdn-teaser-headline a').first(); const url = a.attr('href'); if (!url) return;
+        const name = a.clone().children().remove().end().text().replace(/\s+/g, ' ').trim();
+        const spans = $(li).find('p.fdn-teaser-infoline').first().find('span').map((_, s) => $(s).text().trim()).get();
+        const tags = $(li).find('.fdn-teaser-tag-link').map((_, t) => $(t).text().trim()).get();
+        if (tags.some(t => /clothing|accessories/i.test(t))) return;
+        const prev = out.get(url); if (prev) { if (!prev.kinds.includes(label)) prev.kinds.push(label); return; }
+        // keyword matches must look like a wellness place (keyword search also hits markets, farms…)
+        if (query.startsWith('keywords=') && !/yoga|pilates|meditat|zen|dharma|monastery|tai chi|qigong|barre|wellbeing|wellness|holistic|retreat|fitness|dance|awakening/i.test(name + ' ' + tags.join(' '))) return;
+        out.set(url, { name, street: spans[0] || '', town: spans[1] || '', kinds: [label], url }); added++;
+      });
+      if (!added) break; await sleep(600);
+    }
+  };
+  for (const [id, label] of Object.entries(CFG.chronogramWellnessCategories || {})) await crawl(`locationCategory=${id}`, label);
+  for (const [kw, label] of Object.entries(CFG.chronogramWellnessKeywords || {})) await crawl(`keywords=${encodeURIComponent(kw)}`, label);
+  const studios = []; const seen = new Set();
+  for (const s of out.values()) {
+    const town = ulsterTownIn(s.town); if (!town) continue;
+    const key = (s.name + town).toLowerCase().replace(/[^a-z]/g, ''); if (seen.has(key)) continue; seen.add(key);
+    const g = await geocode(`${s.street}, ${s.town}, NY`) || await geocode(`${town}, Ulster County, NY`);
+    if (!g) continue;
+    studios.push({ id: 'st-' + ((s.url.match(/oid=(\d+)/) || [])[1] || slug(s.name)), name: s.name, kinds: s.kinds, address: `${s.street}, ${s.town}, NY`, town, lat: g.lat, lng: g.lng, url: s.url, source: 'Chronogram' });
+  }
+  return studios;
+}
+
 // ---------- OpenStreetMap restaurants (free, no key) ----------
 async function buildOsmPlaces() {
   const q = `[out:json][timeout:90];area["name"="Ulster County"]["admin_level"="6"]["boundary"="administrative"]->.a;
@@ -283,6 +318,30 @@ async function sheetRows(rows) {
     const address = r.address || [r.venue, r.town, 'NY'].filter(Boolean).join(', ');
     const g = await geocode(address) || (r.town ? await geocode(`${r.town}, Ulster County, NY`) : null);
     const town = ulsterTownIn(r.town) || ulsterTownIn(address) || r.town || null;
+    if (type === 'studio') {
+      if (!g) continue;
+      places.push({ _studio: true, id: 'sh-st-' + slug(r.title), name: r.title, kinds: (r.category || 'Yoga').split(/[;,]/).map(s => s.trim()), address, town, lat: g.lat, lng: g.lng, url: r.link || null, source: 'Chronogram team' });
+      continue;
+    }
+    if (type === 'weekly') {
+      // a regular class: weekday column like "Saturday" or "Mon, Wed"; optional start_date/end_date limit the run
+      const W = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+      const wanted = new Set(String(r.weekday || '').toLowerCase().split(/[^a-z]+/).map(w => W.indexOf(w.slice(0, 3))).filter(i => i >= 0));
+      if (!wanted.size) continue;
+      const from = toISODate(r.start_date) || CFG.windowStart, to = toISODate(r.end_date) || CFG.windowEnd;
+      const days = eachDay(from, to).filter(d => wanted.has(new Date(d + 'T12:00:00Z').getUTCDay()));
+      const pr = parsePrice(r.price);
+      events.push({
+        id: 'sh-wk-' + slug(r.title + '-' + (r.venue || r.town)), title: r.title,
+        category: CATEGORIES.includes(r.category) ? r.category : normalizeCategory(r.category || 'Health & Wellness', r.title, r.description),
+        rawCategory: r.category || '', occurrences: days.map(date => ({ date, start: to24(r.start_time), end: to24(r.end_time) })),
+        ongoing: false, when: `Every ${r.weekday}${r.start_time ? ', ' + r.start_time : ''}`,
+        venue: r.venue || '', address, town, county: CFG.county, lat: g?.lat ?? null, lng: g?.lng ?? null,
+        price: pr.label, priceMin: pr.min, priceMax: pr.max, image: r.image_url || null,
+        description: r.description || '', url: r.link || null, ticketUrl: r.link || null, source: 'Chronogram team'
+      });
+      continue;
+    }
     if (type === 'restaurant' || type === 'food') {
       if (!g) continue;
       places.push({ id: 'sh-' + slug(r.title), name: r.title, cuisine: (r.category || 'Restaurant').split(/[;,]/).map(s => s.trim()), tags: [], address, town, lat: g.lat, lng: g.lng, url: r.link || null, source: 'Chronogram team' });
@@ -327,6 +386,8 @@ async function main() {
     writeJSON(rawEventsFile, cgEvents);
     writeJSON(path.join(CACHE, 'geocode.json'), geoCache);
     writeJSON(path.join(CACHE, 'chronogram-details.json'), detailCache);
+    const studiosBase = await buildStudios();
+    writeJSON(path.join(CACHE, 'studios-base.json'), studiosBase);
     const cgp = await buildChronogramPlaces();
     const osm = await buildOsmPlaces();
     basePlaces = [...cgp, ...osm];
@@ -334,6 +395,9 @@ async function main() {
   }
 
   const sheet = await sheetRows(await readSheet());
+  const sheetStudios = sheet.places.filter(p => p._studio).map(({ _studio, ...p }) => p);
+  sheet.places = sheet.places.filter(p => !p._studio);
+  const studios = [...sheetStudios, ...readJSON(path.join(CACHE, 'studios-base.json'), [])];
 
   let events = cgEvents
     .filter(e => !sheet.hide.has(e.url) && !sheet.hide.has(e.title.toLowerCase()))
@@ -352,9 +416,10 @@ async function main() {
 
   writeJSON(path.join(DATA, 'events.json'), events);
   writeJSON(path.join(DATA, 'places.json'), places);
+  writeJSON(path.join(DATA, 'wellness.json'), studios);
   writeJSON(path.join(DATA, 'meta.json'), {
     updatedAt: new Date().toISOString(), windowStart: CFG.windowStart, windowEnd: CFG.windowEnd, county: CFG.county,
-    counts: { events: events.length, places: places.length, sheetEvents: sheet.events.length, sheetPlaces: sheet.places.length }
+    counts: { events: events.length, places: places.length, studios: studios.length, sheetEvents: sheet.events.length, sheetPlaces: sheet.places.length }
   }, true);
   writeJSON(path.join(CACHE, 'geocode.json'), geoCache);
   writeJSON(path.join(CACHE, 'chronogram-details.json'), detailCache);

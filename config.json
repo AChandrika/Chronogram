@@ -5,6 +5,8 @@
   "windowEnd": "2027-05-31",
   "chronogramBase": "https://calendar.chronogram.com/hudsonvalley",
   "googleSheetCsv": "https://docs.google.com/spreadsheets/d/11COCR19_iwHA74RJLnQBiWoeFtVDu0SgkmfmAJkRoGA/export?format=csv",
+  "chronogramWellnessCategories": { "2125064": "Yoga", "2125205": "Pilates" },
+  "chronogramWellnessKeywords": { "yoga": "Yoga", "pilates": "Pilates", "meditation": "Meditation", "tai chi": "Tai chi", "qigong": "Qigong", "barre": "Barre" },
   "chronogramDiningCategories": {
     "2124940": "General Dining",
     "2124939": "American",

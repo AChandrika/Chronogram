@@ -16,12 +16,22 @@ export const INTERESTS = [
   { cat: 'Outdoors', words: ['outdoors', 'outdoor', 'hike', 'hikes', 'hiking', 'nature', 'ski', 'skiing', 'skate', 'skating', 'trail', 'trails', 'snowshoe', 'birding', 'sports'] },
   { cat: 'Classes & Workshops', words: ['workshop', 'workshops', 'class', 'classes', 'learn', 'craft', 'crafts', 'making'] },
   { cat: 'Talks & Literary', words: ['book', 'books', 'reading', 'readings', 'poetry', 'lecture', 'lectures', 'talk', 'talks', 'author', 'authors', 'literary'] },
-  { cat: 'Wellness', words: ['yoga', 'meditation', 'wellness', 'sound bath', 'spa', 'healing', 'mindfulness'] },
+  { cat: 'Wellness', words: ['yoga', 'pilates', 'barre', 'meditation', 'tai chi', 'qigong', 'breathwork', 'reiki', 'wellness', 'sound bath', 'sound healing', 'spa', 'healing', 'mindfulness'] },
   { cat: 'Markets & Festivals', words: ['market', 'markets', 'fair', 'fairs', 'festival', 'festivals', 'holiday market', 'christmas market', 'craft fair', 'shopping'] },
   { cat: 'Community', words: ['community', 'volunteer', 'fundraiser', 'benefit', 'networking'] }
 ];
 
 const CUISINES = ['pizza', 'italian', 'thai', 'mexican', 'sushi', 'japanese', 'chinese', 'indian', 'french', 'bbq', 'barbecue', 'vegan', 'vegetarian', 'burger', 'burgers', 'bakery', 'coffee', 'cafe', 'brunch', 'diner', 'seafood', 'ramen', 'tacos', 'deli', 'bagels', 'mediterranean', 'american', 'farm-to-table', 'steak', 'dessert', 'ice cream'];
+
+// ---------- booking / availability (read from the listing text; live seat counts aren't available) ----------
+export function bookingOf(e) {
+  const t = ((e.description || '') + ' ' + (e.price || '') + ' ' + (e.title || '')).toLowerCase();
+  const soldOut = /\bsold[\s-]?out\b|\bat capacity\b|\bwait ?list only\b|\bfully booked\b|\bclass is full\b/.test(t);
+  const required = /registration (is )?required|pre-?regist|reserv(e|ation)s? (are |is )?(required|recommended|encouraged|needed)|reserve (your|a) (spot|seat|space)|rsvp (is )?(required|needed)|limited (space|spots|seating|capacity|enrollment)|space is limited|spots are limited|must (register|book|reserve)|advance (tickets?|registration|booking)|book (ahead|in advance|your spot)|sign[- ]?up required|register (in advance|ahead|online)/.test(t);
+  return { soldOut, required };
+}
+const WELLNESS_RE = /\b(yoga|pilates|barre|meditation|meditate|tai chi|qigong|breathwork|sound bath|sound healing|reiki|vinyasa|hatha|yin)\b/i;
+export const isWellness = e => e.category === 'Wellness' || WELLNESS_RE.test(e.title + ' ' + (e.rawCategory || ''));
 
 // ---------- dates ----------
 const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -220,7 +230,9 @@ const fromMin = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${Stri
 
 // ---------- planner ----------
 export function buildPlan(parsed, data) {
-  const { events, places, townCenters } = data;
+  const { places, townCenters } = data;
+  const studios = data.studios || [];
+  const events = data.events.filter(e => !bookingOf(e).soldOut);
   const notes = [...parsed.notes];
   const anchor = parsed.near ? townCenters[parsed.near] : null;
   const used = new Set(parsed.exclude || []); const usedPlaces = new Set(parsed.excludePlaces || []);
@@ -331,11 +343,46 @@ export function buildPlan(parsed, data) {
         .sort((a, b) => b.s - a.s)[0];
       if (extra) chosen.push({ ...extra, bonus: true });
     }
+    // wellness gap-filler (only when the visitor opted in): a real class first, otherwise a nearby studio as a drop-in option
+    let studioStop = null;
+    if (parsed.wellnessFill && chosen.length < maxTimed) {
+      const slots = [{ st: 9 * 60 + 30, slot: 'morning' }, { st: 14 * 60, slot: 'afternoon' }, { st: 17 * 60 + 30, slot: 'evening' }]
+        .filter(x => !hours || hours.has(x.slot));
+      const okRadius = x => !anchor || !parsed.radiusMin || (drive(anchor, x)?.minutes ?? 0) <= parsed.radiusMin;
+      const range = sl => sl.slot === 'morning' ? [7 * 60, 12 * 60] : sl.slot === 'afternoon' ? [12 * 60, 17 * 60] : [17 * 60, 20 * 60];
+      const open = slots.filter(sl => { const [lo, hi] = range(sl); return !chosen.some(c => c.st < hi && c.en > lo); });
+      // 1) a real class in any open part of the day
+      let picked = null;
+      for (const sl of open) {
+        const [lo, hi] = range(sl);
+        const cls = events
+          .map(e => ({ e, occ: e.occurrences.find(o => o.date === date) }))
+          .filter(x => x.occ && x.occ.start && isWellness(x.e) && !used.has(x.e.id) && !chosen.some(c => c.e.id === x.e.id) && okRadius(x.e))
+          .filter(x => parsed.budget == null || (x.e.priceMin ?? 0) <= parsed.budget)
+          .map(x => { const st = toMin(x.occ.start); let en = toMin(x.occ.end); if (en == null || en <= st) en = st + 75; return { ...x, st, en, s: -(anchor ? (miles(anchor, x.e) ?? 10) : 0) + (bookingOf(x.e).required ? -2 : 0) }; })
+          .filter(x => x.st >= lo && x.st < hi && fits(x.st, x.en, x.e))
+          .sort((a, b) => b.s - a.s)[0];
+        if (cls) { picked = cls; break; }
+      }
+      if (picked) chosen.push({ ...picked, wellness: true });
+      // 2) otherwise a nearby studio as a drop-in option
+      else for (const sl of open) {
+        const near = anchor || chosen[0]?.e;
+        const ranked = studios.filter(s => s.lat != null && okRadius(s) && !usedPlaces.has(s.id))
+          .map(s => ({ s, m: near ? miles(near, s) : 0 })).sort((a, b) => a.m - b.m);
+        if (ranked.length && fits(sl.st, sl.st + 75, ranked[0].s)) {
+          studioStop = { type: 'studio', item: ranked[0].s, backup: ranked[1]?.s || null, start: fromMin(sl.st), end: fromMin(sl.st + 75) };
+          usedPlaces.add(ranked[0].s.id);
+          break;
+        }
+      }
+    }
     chosen.sort((a, b) => a.st - b.st);
     chosen.forEach(c => { used.add(c.e.id); usedTitles.push(words(c.e.title)); });
 
     // meals
-    const stops = chosen.map(c => ({ type: 'event', item: c.e, start: fromMin(c.st), end: fromMin(c.en), flexible: !!c.flexible || !c.occ.start, occ: c.occ, bonus: !!c.bonus }));
+    const stops = chosen.map(c => ({ type: 'event', item: c.e, start: fromMin(c.st), end: fromMin(c.en), flexible: !!c.flexible || !c.occ.start, occ: c.occ, bonus: !!c.bonus, wellness: !!c.wellness, booking: bookingOf(c.e) }));
+    if (studioStop) { stops.push(studioStop); stops.sort((a, b) => toMin(a.start) - toMin(b.start)); }
     const pickPlace = (near, kind) => {
       const ref = near && near.lat != null ? near : anchor;
       if (!ref || !places.length) return null;
@@ -351,7 +398,7 @@ export function buildPlan(parsed, data) {
         if (parsed.cuisines && parsed.cuisines.some(c => all.includes(c))) s += 6;
         if (/ice cream|fast food/.test(all)) s -= 3;
         if (kind === 'Breakfast') { if (light) s += 5; else if (barOnly) continue; else s -= 2; }
-        if (kind === 'Lunch') { if (barOnly) s -= 3; }
+        if (kind === 'Lunch') { if (barOnly) s -= 3; if (/dessert|ice cream|bakery|chocolate/.test(all)) s -= 4; }
         if (kind === 'Dinner') { if (barOnly) s -= 2; if (light) s -= 4; }
         if (s > bestS) { bestS = s; best = p; }
       }

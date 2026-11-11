@@ -1,5 +1,6 @@
 import { $, esc, MON, MONTH_LONG, CATS, STYLE, svg, dateObj, isoOf, fmtDate, fmtDateLong, timeRange, todayISO, loadData, bag, dotGrid } from './common.js';
 import { buildIndex, parseSearch, runSearch, pills, hasMeaning } from './search.js';
+import { bookingOf, drive } from './planner.js';
 
 const PAGE = 40;
 let data, idx, today, f, shown = PAGE;
@@ -7,19 +8,19 @@ let data, idx, today, f, shown = PAGE;
 const emptyFilter = () => ({ specificCats: [], cats: [], audience: null, days: null, dayLabel: null, town: null, near: false, time: null, free: false, cheap: false, keywords: [], interestKeywords: [], region: null, notes: [], corrected: [], raw: '' });
 
 // ---------- rendering ----------
-function rowHTML(r) {
+function rowHTML(r, showDate = false) {
   const e = r.e, o = r.occ, [tint, icon] = STYLE[e.category] || STYLE.Community;
   const saved = bag.has(e.id);
   const time = e.ongoing ? 'Open hours' : (o.start ? timeRange(o) : 'All day');
   const more = !e.ongoing && e.occurrences.length > 1 ? `<span class="tag">+${e.occurrences.length - 1} more date${e.occurrences.length > 2 ? 's' : ''}</span>` : '';
   return `<article class="row" data-id="${esc(e.id)}" tabindex="0" aria-label="${esc(e.title)}">
-    <div class="row-time"><b>${esc(time.split('–')[0])}</b>${o.start && o.end ? `<span>to ${esc(time.split('–')[1] || '')}</span>` : ''}</div>
+    <div class="row-time">${showDate ? `<span class="row-date">${esc(fmtDate(o.date))}</span>` : ''}<b>${esc(time.split('–')[0])}</b>${o.start && o.end ? `<span>to ${esc(time.split('–')[1] || '')}</span>` : ''}</div>
     <div class="row-thumb t-${tint}">${svg(icon)}${e.image ? `<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</div>
     <div class="row-main">
       <div class="row-cat c-${tint}">${esc(e.category)}</div>
       <h3>${esc(e.title)}</h3>
       <p class="row-meta">${svg('pin')}<span>${esc([e.venue, e.town].filter(Boolean).join(' · '))}</span></p>
-      <div class="row-tags">${e.price ? `<span class="tag ${e.priceMax === 0 ? 'tag-free' : ''}">${esc(e.price)}</span>` : ''}${r.nearby ? `<span class="tag tag-near">Nearby · ${r.minutes} min</span>` : ''}${more}</div>
+      <div class="row-tags">${e.price ? `<span class="tag ${e.priceMax === 0 ? 'tag-free' : ''}">${esc(e.price)}</span>` : ''}${(b => b.soldOut ? '<span class="tag tag-sold">Sold out</span>' : b.required ? '<span class="tag tag-book">Book ahead</span>' : '')(bookingOf(e))}${r.nearby ? `<span class="tag tag-near">Nearby · ${r.minutes} min</span>` : ''}${more}</div>
     </div>
     <button class="save ${saved ? 'on' : ''}" data-save="${esc(e.id)}" aria-pressed="${saved}" aria-label="${saved ? 'Remove from my day' : 'Save for my day'}" title="${saved ? 'Saved for my day' : 'Save for my day'}">${svg(saved ? 'check' : 'plus')}</button>
   </article>`;
@@ -54,21 +55,31 @@ function render() {
   $('#results-title').textContent = title;
   if (!data.events.length) { $('#list').innerHTML = `<div class="empty"><h3>The calendar is loading its first events</h3><p>They appear after the first automatic update.</p></div>`; return; }
 
+  // wellness searches also list studios (drop-in options without set class times)
+  const wellnessQ = f.cats.includes('Wellness') || f.specificCats.includes('Wellness');
+  let studios = [];
+  if (wellnessQ && data.studios.length) {
+    const kw = f.keywords.find(k => /yoga|pilates|barre|meditation|qigong|tai/.test(k));
+    const anchor = f.town ? data.townCenters[f.town] : null;
+    studios = data.studios.filter(s => !kw || s.kinds.some(k => k.toLowerCase().includes(kw.replace(/s$/, ''))) || s.name.toLowerCase().includes(kw))
+      .filter(s => !f.town || s.town === f.town || (f.near && anchor && s.lat != null && drive(anchor, s).minutes <= 20));
+  }
+  const studiosHTML = studios.length ? `<div class="ongoing"><h3 class="group-title">Studios with regular classes <span>${studios.length}</span></h3><div class="ongoing-row">${studios.map(s => `<a class="mini" href="${esc(s.url)}" target="_blank" rel="noopener"><span class="mini-thumb t-sage">${svg('leaf')}</span><span class="mini-body"><b>${esc(s.name)}</b><span>${esc(s.kinds.join(' / '))} · ${esc(s.town)} · check class times</span></span></a>`).join('')}</div></div>` : '';
   const ongoing = f.cheap || f.keywords.length ? [] : results.filter(r => r.e.ongoing);
   const dated = f.cheap || f.keywords.length ? results : results.filter(r => !r.e.ongoing);
   $('#count').textContent = `${results.length} event${results.length === 1 ? '' : 's'}`;
 
-  $('#ongoing').innerHTML = ongoing.length ? `<div class="ongoing"><h3 class="group-title">Exhibitions and ongoing <span>${ongoing.length}</span></h3><div class="ongoing-row">${ongoing.map(r => {
+  $('#ongoing').innerHTML = studiosHTML + (ongoing.length ? `<div class="ongoing"><h3 class="group-title">Exhibitions and ongoing <span>${ongoing.length}</span></h3><div class="ongoing-row">${ongoing.map(r => {
     const e = r.e, [tint, icon] = STYLE[e.category] || STYLE.Community;
     return `<button class="mini" data-id="${esc(e.id)}"><span class="mini-thumb t-${tint}">${svg(icon)}${e.image ? `<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span><span class="mini-body"><b>${esc(e.title)}</b><span>${esc(e.town || '')} · ${esc(e.when || 'Ongoing')}</span></span></button>`;
-  }).join('')}</div></div>` : '';
+  }).join('')}</div></div>` : '');
 
   const list = dated.slice(0, shown);
   let html = '', last = null;
   const grouped = !(f.cheap || f.keywords.length);
   for (const r of list) {
     if (grouped && r.occ.date !== last) { last = r.occ.date; html += `<h3 class="day-head"><span>${fmtDateLong(r.occ.date)}</span></h3>`; }
-    html += rowHTML(r);
+    html += rowHTML(r, !grouped);
   }
   $('#list').innerHTML = html;
   $('#more').hidden = dated.length <= shown;
