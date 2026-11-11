@@ -1,10 +1,16 @@
-# Chronogram Calendar: Ulster County pilot
+# Chronogram Calendar: Ulster County pilot (v2)
 
-A free, no-sign-up events site for Ulster County (Dec 2026 – May 2027) with a built-in trip planner.
+A free, no-sign-up events site for Ulster County (Dec 2026 – May 2027).
 
-- **Browse:** every Ulster County event from calendar.chronogram.com, with poster images, filters by category, date and town.
-- **Plan:** type something like *"I like music and movies, plan Dec 19–20 near Kingston"*. The site builds a day-by-day plan with events, lunch and dinner stops nearby, drive times, distances and ticket prices.
-- **Costs nothing:** hosting on GitHub Pages, daily updates via GitHub Actions, maps from OpenStreetMap, and a planner that runs in the browser. No API keys or accounts beyond GitHub.
+- **Calendar (index.html):**
+  - A smart search that understands what people type: places ("around New Paltz"), dates ("December", "this weekend"), time of day ("tonight"), "free" or "cheap", "kids" or "adults", interests ("jazz", "theater"). It also fixes typos.
+  - Results are grouped by day, with filters in the sidebar.
+  - A "Save for my day" bag collects events you want to plan around.
+- **Plan my day (plan.html):** six quick steps (When, What, Who, Where, Meals, Budget) build a day-by-day plan.
+  - Meals can be out, at home, or skipped.
+  - You get drive times and ticket prices, and you can swap any stop.
+  - The site remembers your answers in your browser.
+- **Costs nothing:** GitHub Pages hosting, GitHub Actions for daily updates, OpenStreetMap for maps, and the logic runs in the browser. No API keys.
 
 ---
 
@@ -57,8 +63,11 @@ Categories the site understands: Music, Film, Arts & Culture, Theater & Comedy, 
 ## How it works (for whoever maintains it)
 
 ```
-index.html, assets/        the website (plain HTML/CSS/JS, no build step)
-assets/planner.js          the rule-based planner: reads dates, interests, town, budget, food wishes
+index.html, plan.html      the two pages (plain HTML/CSS/JS, no build step)
+assets/search.js           smart search: turns typed text into filters (rules agreed with Chronogram)
+assets/planner.js          day planner: picks events, meals, drive times; also date parsing
+assets/home.js, plan.js    page logic for the calendar and the Plan my day steps
+assets/common.js           shared helpers, icons, saved-events bag, dot-grid effect
 scripts/update.mjs         data pipeline run by GitHub Actions
 scripts/lib.mjs            shared helpers (Ulster town list, category mapping, time parsing)
 config.json                pilot window, county, Google Sheet link, Chronogram dining categories

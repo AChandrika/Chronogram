@@ -59,10 +59,12 @@ function weekendOf(d) { // Sat+Sun on/after d (if d is Sun, the Sat before)
 }
 function range(a, b) { const out = []; for (let d = a; d <= b && out.length < 31; d = addDays(d, 1)) out.push(d); return out; }
 
-export function parseDates(qRaw, today) {
+export function parseDates(qRaw, today, opts = {}) {
+  const cap = opts.cap ?? 4;
   const q = ' ' + qRaw.toLowerCase().replace(/(\d+)(st|nd|rd|th)\b/g, '$1').replace(/[–—]/g, '-').replace(/\s+/g, ' ') + ' ';
   const notes = [];
   let days = [];
+  let monthOnly = false, relative = false;
   const mon = '(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\\.?';
 
   // day count: "2 days", "two days", "3-day", "a weekend"
@@ -123,6 +125,7 @@ export function parseDates(qRaw, today) {
 
   // relative words
   if (!days.length) {
+    relative = /\b(today|tonight|tomorrow|weekend|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/.test(q);
     if (/\b(today|tonight)\b/.test(q)) days.push(today);
     else if (/\btomorrow\b/.test(q)) days.push(addDays(today, 1));
     else if (/\bnext weekend\b/.test(q)) days.push(...weekendOf(addDays(weekendOf(today)[0], 7)));
@@ -143,9 +146,12 @@ export function parseDates(qRaw, today) {
     const mm = q.match(new RegExp(`\\b${mon}\\b`));
     if (mm && !/\bmay i\b/.test(q)) {
       const mo = MONTHS[mm[1].slice(0, 3)]; const y = inferYear(mo, 28, today);
-      const first = weekendOf(mk(y, mo, 1));
-      days.push(...(count && count > 2 ? range(first[0], addDays(first[0], count - 1)) : first));
-      notes.push(`You named a month, so I picked its first weekend. Add exact dates to change it.`);
+      if (opts.monthMode === 'month') { days.push(...range(mk(y, mo, 1), mk(y, mo + 1, 0))); monthOnly = true; }
+      else {
+        const first = weekendOf(mk(y, mo, 1));
+        days.push(...(count && count > 2 ? range(first[0], addDays(first[0], count - 1)) : first));
+        notes.push(`You named a month, so I picked its first weekend. Add exact dates to change it.`);
+      }
     }
   }
 
@@ -158,8 +164,8 @@ export function parseDates(qRaw, today) {
   // unique + sorted + cap
   const seen = new Set();
   days = days.filter(d => { const k = iso(d); if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => a - b);
-  if (days.length > 4) { notes.push(`That's ${days.length} days, so the plan covers the first 4. Narrow the dates for a different stretch.`); days = days.slice(0, 4); }
-  return { days: days.map(iso), hadDates, count, notes };
+  if (days.length > cap) { notes.push(`That's ${days.length} days, so the plan covers the first ${cap}. Narrow the dates for a different stretch.`); days = days.slice(0, cap); }
+  return { days: days.map(iso), hadDates, count, notes, monthOnly, relative };
 }
 
 // ---------- interests, place, budget ----------
@@ -217,10 +223,17 @@ export function buildPlan(parsed, data) {
   const { events, places, townCenters } = data;
   const notes = [...parsed.notes];
   const anchor = parsed.near ? townCenters[parsed.near] : null;
-  const used = new Set(); const usedPlaces = new Set();
+  const used = new Set(parsed.exclude || []); const usedPlaces = new Set(parsed.excludePlaces || []);
   const interests = new Set(parsed.interests);
+  const pinned = new Set(parsed.pinned || []);
+  const maxTimed = parsed.pace === 'relaxed' ? 2 : parsed.pace === 'packed' ? 4 : 3;
+  const hours = parsed.hours && parsed.hours.length ? new Set(parsed.hours) : null;
+  const slotOf = min => min < 12 * 60 ? 'morning' : min < 17 * 60 ? 'afternoon' : 'evening';
+  const meals = parsed.meals || (parsed.noFood ? { breakfast: 'skip', lunch: 'skip', dinner: 'skip' } : { breakfast: 'skip', lunch: 'out', dinner: 'out' });
+  const home = anchor ? { name: 'Home', lat: anchor.lat, lng: anchor.lng } : { name: 'Home' };
 
   function score(e) {
+    if (pinned.has(e.id)) return 100;
     let s = 0;
     const text = (e.title + ' ' + e.description + ' ' + e.rawCategory).toLowerCase();
     if (interests.size) {
@@ -241,13 +254,29 @@ export function buildPlan(parsed, data) {
       else if (e.priceMin > parsed.budget) return -Infinity;
     }
     if (parsed.kids && e.category === 'Family') s += 4;
-    if (anchor) { const m = miles(anchor, e); if (m != null) { if (m > 20) return -Infinity; s -= Math.max(0, m - 3) * 0.5; } }
+    if (parsed.kids) {
+      if (/nightlife|cocktail|craft beverage/i.test(e.rawCategory || '') || /\b(tavern|bar|pub|brewery|brewing|saloon)\b/i.test(e.venue || '') || barVenues.has(norm(e.venue))) s -= 8;
+      const st = e.occurrences.find(o => o.start)?.start; if (st && st >= '19:30') s -= 3;
+    }
+    if (anchor) {
+      const m = miles(anchor, e);
+      if (m != null) {
+        if (parsed.radiusMin) { if (drive(anchor, e).minutes > parsed.radiusMin) return -Infinity; }
+        else if (m > 20) return -Infinity;
+        s -= Math.max(0, m - 3) * 0.5;
+      }
+    }
     if (e.ongoing) s -= 3;
     if (e.image) s += 0.5;
     if (e.price) s += 0.3;
     return s;
   }
 
+  const norm = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const barVenues = new Set(places.filter(p => /\b(bar|pub)\b/i.test((p.cuisine || []).join(' ') + ' ' + (p.tags || []).join(' '))).map(p => norm(p.name)));
+  const words = t => new Set(t.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 3 && !/^(presents?|with|from|featuring|kingston|the|and)$/.test(w)));
+  const usedTitles = [];
+  const similar = e => { const a = words(e.title); return usedTitles.some(b => { let n = 0; for (const w of a) if (b.has(w)) n++; return n && n / Math.min(a.size, b.size) >= 0.6; }); };
   const days = parsed.days.map(date => {
     const pool = events
       .map(e => ({ e, occ: e.occurrences.find(o => o.date === date) }))
@@ -263,19 +292,21 @@ export function buildPlan(parsed, data) {
       return en + gap <= c.st || st >= c.en + gap;
     });
     for (const x of pool) {
-      if (chosen.filter(c => !c.e.ongoing).length >= 3) break;
+      if (chosen.filter(c => !c.e.ongoing).length >= maxTimed) break;
       if (x.e.ongoing || !x.occ.start) continue;
       const st = toMin(x.occ.start); let en = toMin(x.occ.end);
+      if (hours && !hours.has(slotOf(st)) && !pinned.has(x.e.id)) continue;
       if (en == null || en <= st) en = st + 120;
       if (en - st > 300) en = st + 180; // long open-house style events: plan ~3h
       const adj = x.s - (cats[x.e.category] ? 4 : 0);
       if (adj < 0 && interests.size) continue;
       if (!fits(st, en, x.e)) continue;
+      if (similar(x.e) || chosen.some(c => { const a = words(c.e.title), b = words(x.e.title); let n = 0; for (const w of a) if (b.has(w)) n++; return n && n / Math.min(a.size, b.size) >= 0.6; })) continue;
       chosen.push({ ...x, st, en }); cats[x.e.category] = 1;
     }
     // daytime filler: an exhibit or all-day event if the day is thin before 4pm
     const hasDaytime = chosen.some(c => c.st < 16 * 60);
-    if (!hasDaytime) {
+    if (!hasDaytime && (!hours || hours.has('afternoon')) && chosen.length < maxTimed) {
       const fill = pool.find(x => (x.e.ongoing || !x.occ.start) && !chosen.some(c => c.e.id === x.e.id));
       if (fill) {
         const st = 13 * 60 + 30, en = st + 90;
@@ -283,12 +314,13 @@ export function buildPlan(parsed, data) {
       }
     }
     // thin day: suggest one daytime outing outside the stated interests ("something different")
-    if (chosen.length < 2 && interests.size) {
+    if (chosen.length < Math.min(2, maxTimed) && interests.size && (!hours || hours.has('afternoon') || hours.has('morning'))) {
       const near = anchor || chosen[0]?.e;
       const extra = events
         .map(e => ({ e, occ: e.occurrences.find(o => o.date === date) }))
         .filter(x => x.occ && !used.has(x.e.id) && !chosen.some(c => c.e.id === x.e.id))
         .filter(x => parsed.budget == null || (x.e.priceMin ?? 0) <= parsed.budget)
+        .filter(x => !anchor || !parsed.radiusMin || (drive(anchor, x.e)?.minutes ?? 0) <= parsed.radiusMin)
         .map(x => {
           const st = x.occ.start ? toMin(x.occ.start) : 13 * 60 + 30;
           let en = x.occ.end ? toMin(x.occ.end) : st + 120; if (en <= st || en - st > 300) en = st + Math.min(180, Math.max(90, en - st));
@@ -300,56 +332,70 @@ export function buildPlan(parsed, data) {
       if (extra) chosen.push({ ...extra, bonus: true });
     }
     chosen.sort((a, b) => a.st - b.st);
-    chosen.forEach(c => used.add(c.e.id));
+    chosen.forEach(c => { used.add(c.e.id); usedTitles.push(words(c.e.title)); });
 
     // meals
     const stops = chosen.map(c => ({ type: 'event', item: c.e, start: fromMin(c.st), end: fromMin(c.en), flexible: !!c.flexible || !c.occ.start, occ: c.occ, bonus: !!c.bonus }));
-    if (!parsed.noFood && places.length) {
-      const pickPlace = (near, lunch) => {
-        const ref = near && near.lat != null ? near : anchor;
-        if (!ref) return null;
-        let best = null, bestS = -Infinity;
-        for (const p of places) {
-          if (usedPlaces.has(p.id)) continue;
-          const m = miles(ref, p); if (m == null || m > 12) continue;
-          const tags = (p.tags || []).join(' ').toLowerCase(), cz = (p.cuisine || []).join(' ').toLowerCase();
-          if (lunch && /\b(bar|pub)\b/.test(tags) && !/restaurant/.test(tags)) continue;
-          let s = -m;
-          if (p.source !== 'OpenStreetMap') s += 1.5; // Chronogram listings first
-          if (parsed.cuisines.some(c => cz.includes(c) || p.name.toLowerCase().includes(c))) s += 6;
-          if (/ice cream|fast food/.test(cz + ' ' + tags)) s -= 3;
-          if (/\b(bar|pub)\b/.test(cz + ' ' + tags) && !/dining|restaurant|italian|american|thai|french|pizza|mediterranean/.test(cz)) s -= 2;
-          if (!lunch && /bagel|deli|bakery|coffee|cafe/.test(cz + ' ' + tags)) s -= 3;
-          if (lunch && /bar\b/.test(cz)) s -= 2;
-          if (s > bestS) { bestS = s; best = p; }
-        }
-        if (best) usedPlaces.add(best.id);
-        return best;
-      };
-      const daytime = stops.filter(s => toMin(s.start) < 15 * 60);
-      if (daytime.length || stops.length === 0) {
-        const ref = daytime.reduce((b, s) => (!b || Math.abs(toMin(s.start) - 750) < Math.abs(toMin(b.start) - 750)) ? s : b, null);
-        let lt = 12 * 60 + 15;
-        // move lunch so it doesn't collide
-        for (const s of stops) { const a = toMin(s.start), b = toMin(s.end); if (lt < b && lt + 60 > a) lt = (a - 75 >= 11 * 60) ? a - 75 : b + 15; }
-        const p = pickPlace(ref?.item || null, true);
-        if (p && lt <= 15 * 60) stops.push({ type: 'meal', meal: 'Lunch', item: p, start: fromMin(lt), end: fromMin(lt + 60) });
+    const pickPlace = (near, kind) => {
+      const ref = near && near.lat != null ? near : anchor;
+      if (!ref || !places.length) return null;
+      let best = null, bestS = -Infinity;
+      for (const p of places) {
+        if (usedPlaces.has(p.id)) continue;
+        const m = miles(ref, p); if (m == null || m > 12) continue;
+        const tags = (p.tags || []).join(' ').toLowerCase(), cz = (p.cuisine || []).join(' ').toLowerCase(), all = cz + ' ' + tags + ' ' + p.name.toLowerCase();
+        const barOnly = /\b(bar|pub)\b/.test(cz + ' ' + tags) && !/dining|restaurant|italian|american|thai|french|pizza|mediterranean|barbecue/.test(cz);
+        const light = /bagel|deli|bakery|coffee|cafe|dessert/.test(all);
+        let s = -m;
+        if (p.source !== 'OpenStreetMap') s += 1.5;
+        if (parsed.cuisines && parsed.cuisines.some(c => all.includes(c))) s += 6;
+        if (/ice cream|fast food/.test(all)) s -= 3;
+        if (kind === 'Breakfast') { if (light) s += 5; else if (barOnly) continue; else s -= 2; }
+        if (kind === 'Lunch') { if (barOnly) s -= 3; }
+        if (kind === 'Dinner') { if (barOnly) s -= 2; if (light) s -= 4; }
+        if (s > bestS) { bestS = s; best = p; }
       }
+      if (best) usedPlaces.add(best.id);
+      return best;
+    };
+    const addMeal = (kind, t, dur, near) => {
+      const mode = meals[kind.toLowerCase()];
+      if (!mode || mode === 'skip' || t == null) return;
+      if (mode === 'home') { stops.push({ type: 'home', meal: kind, item: home, start: fromMin(t), end: fromMin(t + dur) }); return; }
+      const p = pickPlace(near, kind);
+      if (p) stops.push({ type: 'meal', meal: kind, item: p, start: fromMin(t), end: fromMin(t + dur) });
+    };
+    const busy = (t, d) => stops.some(s => t < toMin(s.end) + 10 && t + d + 10 > toMin(s.start));
+    // breakfast
+    {
+      const first = stops[0];
+      let bt = 9 * 60;
+      if (first && toMin(first.start) < 10 * 60) bt = Math.max(7 * 60 + 30, toMin(first.start) - 70);
+      if (!busy(bt, 45)) addMeal('Breakfast', bt, 45, first?.item || null);
+    }
+    // lunch
+    {
+      const daytime = stops.filter(s => s.type === 'event' && toMin(s.start) < 15 * 60);
+      const ref = daytime.reduce((b, s) => (!b || Math.abs(toMin(s.start) - 750) < Math.abs(toMin(b.start) - 750)) ? s : b, null);
+      let lt = 12 * 60 + 15;
+      for (const s of stops) { const a2 = toMin(s.start), b2 = toMin(s.end); if (lt < b2 && lt + 60 > a2) lt = (a2 - 75 >= 11 * 60) ? a2 - 75 : b2 + 15; }
+      if (lt <= 15 * 60 + 30 && !busy(lt, 60)) addMeal('Lunch', lt, 60, ref?.item || stops.find(s => s.type === 'event')?.item || null);
+    }
+    // dinner
+    {
       const evening = stops.find(s => s.type === 'event' && toMin(s.start) >= 17 * 60);
-      let dt, ref;
-      const free = t => !stops.some(s => t < toMin(s.end) + 10 && t + 75 + 10 > toMin(s.start));
-      const ok = t => t != null && t >= 16 * 60 + 30 && t <= 21 * 60 + 30 && free(t);
+      const ok = t => t != null && t >= 16 * 60 + 30 && t <= 21 * 60 + 30 && !busy(t, 75);
+      let dt = null, ref = null;
       if (evening) {
         ref = evening.item;
         const before = stops.filter(s => toMin(s.end) <= toMin(evening.start)).pop();
-        const cands = [toMin(evening.start) - 100, toMin(evening.start) - 90, before ? toMin(before.end) + 20 : null, toMin(evening.end) + 15];
-        dt = cands.find(ok) ?? null;
-        if (dt === toMin(evening.end) + 15) ref = evening.item;
-      } else { const last = [...stops].filter(s => s.type === 'event').pop(); dt = Math.max(18 * 60, last ? toMin(last.end) + 30 : 18 * 60 + 30); ref = last?.item || null; }
-      if (dt != null && free(dt)) {
-        const p = pickPlace(ref, false);
-        if (p) stops.push({ type: 'meal', meal: 'Dinner', item: p, start: fromMin(dt), end: fromMin(dt + 75) });
+        dt = [toMin(evening.start) - 100, toMin(evening.start) - 90, before ? toMin(before.end) + 20 : null, toMin(evening.end) + 15].find(ok) ?? null;
+      } else {
+        const last = [...stops].filter(s => s.type === 'event').pop();
+        dt = Math.max(18 * 60, last ? toMin(last.end) + 30 : 18 * 60 + 30); ref = last?.item || null;
+        if (!ok(dt)) dt = null;
       }
+      addMeal('Dinner', dt, 75, ref);
     }
     stops.sort((a, b) => toMin(a.start) - toMin(b.start));
     const legs = stops.slice(1).map((s, i) => drive(stops[i].item, s.item));

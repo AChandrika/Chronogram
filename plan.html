@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Plan my day · Chronogram Community Calendar</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%238e3b22%22/%3E%3Ctext x=%2216%22 y=%2223%22 font-size=%2220%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22Georgia%22%3EC%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="planpage">
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="./"><span class="brand-mark">Chronogram<span>Media</span></span><span class="brand-divider"></span><span class="brand-sub">Community Calendar</span></a>
+      <nav class="nav" aria-label="Main">
+        <a href="./">Calendar</a>
+        <a href="plan.html" class="nav-plan" aria-current="page">Plan my day</a>
+        <a href="./#about">About</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap planner">
+    <section class="wizard" id="wizard" aria-live="polite">
+      <div class="wizard-top">
+        <p class="eyebrow">Plan my day</p>
+        <h1 class="wizard-h1">Let's plan your day in Ulster County</h1>
+        <ol class="steps" id="steps"></ol>
+      </div>
+      <div class="step-body" id="step-body"></div>
+      <div class="wizard-foot">
+        <button class="btn btn-ghost" id="back">Back</button>
+        <span class="step-count" id="step-count"></span>
+        <button class="btn btn-primary" id="next">Next</button>
+      </div>
+    </section>
+
+    <section class="plan-result" id="result" hidden></section>
+
+    <aside class="summary" id="summary" aria-label="Your answers"></aside>
+  </main>
+
+  <footer class="site-footer"><div class="wrap">© Chronogram Media · Pilot preview, not for public distribution · Map data © OpenStreetMap contributors</div></footer>
+  <dialog id="detail" class="detail" aria-labelledby="detail-title"></dialog>
+  <script type="module" src="assets/plan.js"></script>
+</body>
+</html>
