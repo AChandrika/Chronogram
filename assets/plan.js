@@ -22,10 +22,10 @@ let data, today, step = 0, prefs, swap = { exclude: [], excludePlaces: [] }, las
 function defaults() {
   const base = dateObj(today < data.windowStart ? data.windowStart : today);
   const sat = new Date(base); sat.setDate(base.getDate() + ((6 - base.getDay() + 7) % 7));
-  return { start: isoOf(sat), count: 1, hours: ['morning', 'afternoon', 'evening'], interests: [], who: null, town: data.topTowns[0] || 'Kingston', radius: 30, meals: { breakfast: 'skip', lunch: 'out', dinner: 'out' }, cuisine: 'Any', budget: null, pace: 'balanced', pinned: [], wellnessFill: false };
+  return { start: isoOf(sat), count: 1, hours: ['morning', 'afternoon', 'evening'], hoursAny: true, interests: [], who: null, town: data.topTowns[0] || 'Kingston', radius: 30, meals: { breakfast: 'skip', lunch: 'out', dinner: 'out' }, cuisine: 'Any', budget: null, pace: 'balanced', pinned: [], wellnessFill: false };
 }
 const load = () => { try { return JSON.parse(localStorage.getItem('cg-prefs') || 'null'); } catch { return null; } };
-const save = () => { try { const { pinned, ...rest } = prefs; localStorage.setItem('cg-prefs', JSON.stringify(rest)); } catch {} };
+const save = () => { try { const { pinned, _fromText, ...rest } = prefs; localStorage.setItem('cg-prefs', JSON.stringify(rest)); } catch {} };
 const daysOf = p => Array.from({ length: p.count }, (_, i) => { const d = dateObj(p.start); d.setDate(d.getDate() + i); return isoOf(d); });
 
 // ---------- wizard ----------
@@ -50,7 +50,7 @@ function renderStep() {
         <div><span class="field-label">How many days?</span><div class="stepper"><button data-count="-1" aria-label="Fewer days">−</button><b>${prefs.count} day${prefs.count > 1 ? 's' : ''}</b><button data-count="1" aria-label="More days">+</button></div></div>
       </div>
       <p class="field-hint">${daysOf(prefs).map(fmtDate).join(' · ')}</p>
-      <div class="field"><span class="field-label">What times are you free?</span><div class="cards three">${HOURS.map(x => `<button class="card-opt ${prefs.hours.includes(x.v) ? 'on' : ''}" data-hour="${x.v}" aria-pressed="${prefs.hours.includes(x.v)}">${svg(x.icon)}<b>${x.label}</b></button>`).join('')}</div></div>
+      <div class="field"><span class="field-label">What times are you free?</span><div class="cards four">${HOURS.map(x => { const on = !prefs.hoursAny && prefs.hours.includes(x.v); return `<button class="card-opt ${on ? 'on' : ''}" data-hour="${x.v}" aria-pressed="${on}">${svg(x.icon)}<b>${x.label}</b></button>`; }).join('')}<button class="card-opt ${prefs.hoursAny ? 'on' : ''}" data-hour="any" aria-pressed="${!!prefs.hoursAny}">${svg('clock')}<b>Not sure yet</b><span>We'll use the whole day</span></button></div></div>
       <details class="freetext"><summary>Prefer to type? Describe your day in your own words</summary>
         <form id="free-form"><input id="free" class="select" placeholder="I like live music and art, Dec 19–20, near Kingston, Italian dinner"><button class="btn btn-ghost" type="submit">Plan it</button></form></details>`;
   }
@@ -92,7 +92,7 @@ function renderSummary() {
   const meals = Object.entries(prefs.meals).filter(([, v]) => v !== 'skip').map(([k, v]) => `${k[0].toUpperCase() + k.slice(1)} ${v === 'out' ? 'out' : 'at home'}`).join(', ') || 'No meals';
   const pinned = prefs.pinned.map(id => data.events.find(e => e.id === id)).filter(Boolean);
   $('#summary').innerHTML = `<div class="summary-card"><h2>Your day so far</h2><ul>
-    ${it(0, 'When', `${ds.length > 1 ? fmtDate(ds[0]) + ' – ' + fmtDate(ds.at(-1)) : fmtDate(ds[0])}<small>${prefs.hours.length === 3 ? 'All day' : prefs.hours.map(h => h[0].toUpperCase() + h.slice(1)).join(', ')}</small>`)}
+    ${it(0, 'When', `${ds.length > 1 ? fmtDate(ds[0]) + ' – ' + fmtDate(ds.at(-1)) : fmtDate(ds[0])}<small>${prefs.hoursAny || prefs.hours.length === 3 ? 'Any time' : prefs.hours.map(h => h[0].toUpperCase() + h.slice(1)).join(', ')}</small>`)}
     ${it(1, 'What', (prefs.interests.length ? esc(prefs.interests.join(', ')) : 'A bit of everything') + (prefs.wellnessFill ? '<small>Yoga or pilates for gaps</small>' : ''))}
     ${it(2, 'Who', prefs.who ? WHO.find(w => w.v === prefs.who).label : '<i>Not picked yet</i>')}
     ${it(3, 'Where', `${esc(prefs.town)}<small>${prefs.radius ? 'Within ' + prefs.radius + ' min' : 'Anywhere in the county'}</small>`)}
@@ -107,7 +107,7 @@ function toParsed() {
   return {
     days: daysOf(prefs), notes: [], interests: prefs.interests, keywords: [], near: prefs.town,
     budget: prefs.budget === 'free' ? 0 : prefs.budget, cuisines: prefs.cuisine === 'Any' ? [] : (cz[prefs.cuisine] || [prefs.cuisine.toLowerCase()]),
-    kids: prefs.who === 'family', dateNight: prefs.who === 'couple', hours: prefs.hours, radiusMin: prefs.radius, meals: prefs.meals,
+    kids: prefs.who === 'family', dateNight: prefs.who === 'couple', hours: prefs.hoursAny ? null : prefs.hours, radiusMin: prefs.radius, meals: prefs.meals,
     pace: prefs.pace === 'balanced' ? null : prefs.pace, wellnessFill: !!prefs.wellnessFill, pinned: prefs.pinned, exclude: swap.exclude, excludePlaces: swap.excludePlaces
   };
 }
@@ -166,6 +166,7 @@ function renderResult(plan) {
       <div class="total"><b>${evCount}</b><span>event${evCount === 1 ? '' : 's'}</span></div>
       <div class="total"><b>${plan.days.reduce((n, d) => n + d.stops.filter(s => s.type === 'meal').length, 0)}</b><span>places to eat</span></div>
     </div>
+    ${prefs._fromText?.kept?.length ? `<div class="kept">${svg('sparkle')}<span>Planned from “${esc(prefs._fromText.q)}”. Also using your saved answers: <b>${esc(prefs._fromText.kept.join(' · '))}</b></span><button class="link" data-ignore-saved>Ignore these</button></div>` : ''}
     ${plan.notes.length ? `<div class="notes">${plan.notes.map(n => `<p>${esc(n)}</p>`).join('')}</div>` : ''}
     <div class="days">${days}</div>
     <p class="fine">Drive times are estimates. Check event times with the venue before you go.</p>`;
@@ -211,12 +212,21 @@ function wire() {
     if (e.target.id !== 'free-form') return; e.preventDefault();
     const q = $('#free').value.trim(); if (!q) return;
     const p = parseQuery(q, { today: dateObj(today < data.windowStart ? data.windowStart : today), towns: data.towns });
+    // a typed request starts fresh, but keeps a few "about you" answers (and says so above the plan)
+    const old = prefs, d0 = defaults();
+    prefs = { ...d0, town: p.near || old.town, radius: old.radius, meals: p.noFood ? { breakfast: 'skip', lunch: 'skip', dinner: 'skip' } : old.meals, pinned: [] };
     if (p.days.length) { prefs.start = p.days[0]; prefs.count = Math.min(4, p.days.length); }
-    if (p.interests.length) prefs.interests = p.interests.filter(c => c !== 'Family');
-    if (p.near) prefs.town = p.near;
+    prefs.interests = p.interests.filter(c => c !== 'Family');
     if (p.budget != null) prefs.budget = p.budget === 0 ? 'free' : p.budget <= 25 ? 25 : p.budget <= 50 ? 50 : null;
     if (p.kids) prefs.who = 'family'; else if (p.dateNight) prefs.who = 'couple';
     if (p.cuisines.length) { const c = CUISINES.find(x => x.toLowerCase() === p.cuisines[0]); if (c) prefs.cuisine = c; }
+    if (p.interests.includes('Wellness')) prefs.wellnessFill = true;
+    const kept = [];
+    if (!p.near && prefs.town !== d0.town) kept.push(`starting from ${prefs.town}`);
+    if (prefs.radius !== d0.radius) kept.push(prefs.radius ? `within ${prefs.radius} min` : 'anywhere in the county');
+    if (!p.noFood && JSON.stringify(prefs.meals) !== JSON.stringify(d0.meals)) kept.push(Object.entries(prefs.meals).filter(([, v]) => v !== 'skip').map(([k, v]) => `${k} ${v === 'out' ? 'out' : 'at home'}`).join(', ') || 'no meals');
+    prefs._fromText = { q, kept };
+    swap = { exclude: [], excludePlaces: [] };
     build();
   });
   document.addEventListener('click', e => {
@@ -225,7 +235,13 @@ function wire() {
     if (d.step !== undefined) { if ($('#result').hidden === false || +d.step <= step || prefs._visited?.includes(+d.step)) go(+d.step); return; }
     if (d.weekend) { prefs.start = d.weekend; prefs.count = 2; renderStep(); return; }
     if (d.count) { prefs.count = Math.max(1, Math.min(4, prefs.count + +d.count)); renderStep(); return; }
-    if (d.hour) { const h = prefs.hours; prefs.hours = h.includes(d.hour) ? (h.length > 1 ? h.filter(x => x !== d.hour) : h) : [...h, d.hour]; renderStep(); return; }
+    if (d.hour) {
+      const ALL = ['morning', 'afternoon', 'evening'];
+      if (d.hour === 'any') { prefs.hoursAny = true; prefs.hours = ALL; }
+      else if (prefs.hoursAny) { prefs.hoursAny = false; prefs.hours = [d.hour]; }
+      else { const h = prefs.hours.includes(d.hour) ? prefs.hours.filter(x => x !== d.hour) : [...prefs.hours, d.hour]; if (h.length) prefs.hours = h; else { prefs.hoursAny = true; prefs.hours = ALL; } }
+      renderStep(); return;
+    }
     if (d.int) { prefs.interests = d.int === '__any' ? [] : prefs.interests.includes(d.int) ? prefs.interests.filter(x => x !== d.int) : [...prefs.interests, d.int]; renderStep(); return; }
     if (d.who) { prefs.who = d.who; renderStep(); setTimeout(() => go(step + 1), 250); return; }
     if (d.radius) { prefs.radius = d.radius === 'any' ? null : +d.radius; renderStep(); return; }
@@ -235,7 +251,8 @@ function wire() {
     if (d.pace) { prefs.pace = d.pace; renderStep(); return; }
     if (d.swap) { swap.exclude.push(d.swap); prefs.pinned = prefs.pinned.filter(x => x !== d.swap); build(false); return; }
     if (d.swapPlace) { swap.excludePlaces.push(d.swapPlace); build(false); return; }
-    if (d.edit !== undefined) { swap = { exclude: [], excludePlaces: [] }; go(0); return; }
+    if (d.ignoreSaved !== undefined) { const d0 = defaults(); const town = prefs._fromText.kept.some(k => k.startsWith('starting from')) ? d0.town : prefs.town; prefs = { ...prefs, town, radius: d0.radius, meals: d0.meals, _fromText: { ...prefs._fromText, kept: [] } }; build(false); return; }
+    if (d.edit !== undefined) { if (prefs._fromText) delete prefs._fromText; swap = { exclude: [], excludePlaces: [] }; go(0); return; }
     if (d.copy !== undefined) { navigator.clipboard?.writeText(location.href); t.innerHTML = `${svg('check')} Link copied`; return; }
     if (d.close !== undefined) { $('#detail').close(); return; }
     if (d.id) openDetail(d.id);
