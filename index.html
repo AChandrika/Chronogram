@@ -26,6 +26,7 @@
 
   <main>
     <section class="hero wrap">
+      <div class="hero-main">
       <p class="eyebrow">Ulster County · <span id="window-label">December 2026 – May 2027</span></p>
       <h1>What's on in Ulster County</h1>
       <form class="search" id="search-form" role="search" autocomplete="off">
@@ -35,20 +36,20 @@
         <button class="btn btn-primary" type="submit">Search</button>
       </form>
       <div class="understood" id="understood" aria-live="polite"></div>
+      </div>
+    <a class="plan-card" href="plan.html">
+      <canvas aria-hidden="true"></canvas>
+      <span class="plan-card-body">
+        <span class="plan-card-kicker">Plan my day</span>
+        <span class="plan-card-title">Need help planning your day?</span>
+        <span class="plan-card-text">A few quick questions, and we'll line up events, meals and drive times.</span>
+        <span class="plan-card-cta">Start planning <span class="arrow"></span></span>
+      </span>
+    </a>
     </section>
 
     <div class="wrap layout">
       <aside class="sidebar" aria-label="Filters">
-        <a class="plan-card" href="plan.html">
-          <canvas aria-hidden="true"></canvas>
-          <span class="plan-card-body">
-            <span class="plan-card-kicker">Plan my day</span>
-            <span class="plan-card-title">Need help planning your day?</span>
-            <span class="plan-card-text">Answer a few quick questions. We'll line up events, meals and drive times.</span>
-            <span class="plan-card-cta">Start planning <span class="arrow"></span></span>
-          </span>
-        </a>
-
         <button class="filters-toggle" id="filters-toggle" aria-expanded="false">Filters <span id="filters-n"></span></button>
         <div class="filter-group">
           <h2 class="filter-title">When</h2>

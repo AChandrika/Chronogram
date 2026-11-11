@@ -95,7 +95,7 @@ export function dotGrid(canvas) {
   wrap.addEventListener('pointermove', e => { const r = wrap.getBoundingClientRect(); tx = e.clientX - r.left; ty = e.clientY - r.top; idle = false; });
   wrap.addEventListener('pointerleave', () => { idle = true; });
   new IntersectionObserver(([en]) => { visible = en.isIntersecting; if (visible) requestAnimationFrame(frame); }).observe(wrap);
-  const G = 20, R = 120;
+  const G = 12, R = 95; // dense, tiny dots: the hover reads as a soft glow
   function frame() {
     if (!visible) return;
     t += 0.01;
@@ -104,9 +104,9 @@ export function dotGrid(canvas) {
     x.clearRect(0, 0, W, H);
     for (let gy = G / 2; gy < H; gy += G) for (let gx = G / 2; gx < W; gx += G) {
       const d = Math.hypot(gx - mx, gy - my), k = Math.max(0, 1 - d / R);
-      if (k <= 0.02) { x.fillStyle = 'rgba(130,118,104,0.30)'; x.beginPath(); x.arc(gx, gy, 1.2, 0, 7); x.fill(); continue; }
-      x.strokeStyle = `rgba(${Math.round(150 + 60 * k)},${Math.round(62 + 40 * k)},36,${0.35 + 0.65 * k})`;
-      x.lineWidth = 1.1 + k * 1.5; x.beginPath(); x.arc(gx, gy, 1.8 + k * 5, 0, 7); x.stroke();
+      if (k <= 0.02) { x.fillStyle = 'rgba(142,59,34,0.16)'; x.beginPath(); x.arc(gx, gy, 0.6, 0, 7); x.fill(); continue; }
+      x.strokeStyle = `rgba(142,59,34,${0.25 + 0.75 * k})`;
+      x.lineWidth = 0.7 + k * 0.8; x.beginPath(); x.arc(gx, gy, 0.7 + k * 2.4, 0, 7); x.stroke();
     }
     if (!reduce) requestAnimationFrame(frame);
   }
