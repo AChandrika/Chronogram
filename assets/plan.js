@@ -148,7 +148,7 @@ function stopHTML(s, d, i) {
   return legHTML + `<div class="stop"><div class="stop-time">${s.flexible ? 'Afternoon<small>open hours</small>' : fmtTime(s.start) + (s.occ?.end ? `<small>to ${fmtTime(s.occ.end)}</small>` : '')}</div>
     <div class="stop-box ev"><button class="stop-open" data-id="${esc(e.id)}"><span class="stop-thumb t-${tint}">${svg(icon)}${e.image ? `<img src="${esc(e.image)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>
       <span class="stop-txt"><span class="stop-kind c-${tint}">${s.wellness ? 'Fits your gap · ' : ''}${s.bonus ? 'Something different · ' : ''}${prefs.pinned.includes(e.id) ? 'Your pick · ' : ''}${esc(e.category)}</span><h4>${esc(e.title)}</h4><p>${esc([e.venue, e.town].filter(Boolean).join(' · '))}</p></span></button>
-      <div class="stop-actions"><span class="tag ${e.priceMax === 0 ? 'tag-free' : ''}">${esc(e.price || 'Price not listed')}</span>${s.booking?.required ? `<span class="tag tag-book">Book ahead</span>` : ''}${e.ticketUrl ? `<a href="${esc(e.ticketUrl)}" target="_blank" rel="noopener">${s.booking?.required || s.wellness ? 'Check availability' : 'Tickets'}</a>` : (s.booking?.required || s.wellness) && e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">Check availability</a>` : ''}<button class="swap" data-swap="${esc(e.id)}">${svg('swap')} Swap</button></div></div></div>`;
+      <div class="stop-actions"><span class="tag ${e.priceMax === 0 ? 'tag-free' : ''}">${esc(e.price || 'Price not listed')}</span>${s.booking?.required ? `<span class="tag tag-book">Book ahead</span>` : ''}${e.ticketUrl ? `<a href="${esc(e.ticketUrl)}" target="_blank" rel="noopener">${s.booking?.required || s.wellness ? 'Check availability' : 'Tickets'}</a>` : (s.booking?.required || s.wellness) ? (st => st ? `<a href="${esc(studioLink(st))}" target="_blank" rel="noopener">Check availability</a>` : e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener">Check availability</a>` : '')(studioFor(e)) : ''}<button class="swap" data-swap="${esc(e.id)}">${svg('swap')} Swap</button></div></div></div>`;
 }
 
 function renderResult(plan) {
@@ -170,6 +170,10 @@ function renderResult(plan) {
     <div class="days">${days}</div>
     <p class="fine">Drive times are estimates. Check event times with the venue before you go.</p>`;
 }
+
+// a class held at a known studio links to that studio's own site
+const nmz = t => String(t || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+function studioFor(e) { const v = nmz(e.venue); return v.length > 4 ? (data.studios || []).find(s => s.website && (nmz(s.name) === v || v.includes(nmz(s.name)) || nmz(s.name).includes(v))) : null; }
 
 // ---------- detail ----------
 function openDetail(id) {

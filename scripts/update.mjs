@@ -330,8 +330,8 @@ async function sheetRows(rows) {
     const g = await geocode(address) || (r.town ? await geocode(`${r.town}, Ulster County, NY`) : null);
     const town = ulsterTownIn(r.town) || ulsterTownIn(address) || r.town || null;
     if (type === 'studio') {
-      if (!g) continue;
-      places.push({ _studio: true, id: 'sh-st-' + slug(r.title), name: r.title, kinds: (r.category || 'Yoga').split(/[;,]/).map(s => s.trim()), address, town, lat: g.lat, lng: g.lng, url: r.link || null, website: r.link || null, source: 'Chronogram team' });
+      // also used just to set/override a known studio's website: then only title + link are needed
+      places.push({ _studio: true, id: 'sh-st-' + slug(r.title), name: r.title, kinds: (r.category || 'Yoga').split(/[;,]/).map(s => s.trim()).filter(Boolean), address, town, lat: g?.lat ?? null, lng: g?.lng ?? null, url: r.link || null, website: r.link || null, source: 'Chronogram team' });
       continue;
     }
     if (type === 'weekly') {
@@ -408,7 +408,14 @@ async function main() {
   const sheet = await sheetRows(await readSheet());
   const sheetStudios = sheet.places.filter(p => p._studio).map(({ _studio, ...p }) => p);
   sheet.places = sheet.places.filter(p => !p._studio);
-  const studios = [...sheetStudios, ...readJSON(path.join(CACHE, 'studios-base.json'), [])];
+  // sheet rows override a studio with the same name (e.g. to add its official website); new ones are added
+  const studios = readJSON(path.join(CACHE, 'studios-base.json'), []).map(s => ({ ...s }));
+  const nm = t => String(t).toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (const sh of sheetStudios) {
+    const match = studios.find(s => nm(s.name) === nm(sh.name) || (nm(sh.name).length > 6 && (nm(s.name).includes(nm(sh.name)) || nm(sh.name).includes(nm(s.name)))));
+    if (match) { if (sh.website) match.website = sh.website; if (sh.kinds.length) match.kinds = [...new Set([...match.kinds, ...sh.kinds])]; }
+    else if (sh.lat != null) studios.unshift(sh);
+  }
 
   let events = cgEvents
     .filter(e => !sheet.hide.has(e.url) && !sheet.hide.has(e.title.toLowerCase()))
