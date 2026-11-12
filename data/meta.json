@@ -1,10 +1,10 @@
 {
- "updatedAt": "2026-11-12T13:12:49.342Z",
+ "updatedAt": "2026-11-12T17:50:51.806Z",
  "windowStart": "2026-12-01",
  "windowEnd": "2027-05-31",
  "county": "Ulster",
  "counts": {
-  "events": 106,
+  "events": 114,
   "places": 427,
   "studios": 19,
   "sheetEvents": 0,
